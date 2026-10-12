@@ -1,0 +1,1560 @@
+---
+title: "DuckDB desde R: trabajando con millones de registros"
+subtitle: "¿Cómo consultar y procesar datos distribuidos en múltiples archivos sin cargarlos todos en R?"
+author: "Ana Gundermann"
+date: today
+date-format: "DD/MM/YYYY"
+lang: es
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-summary: "Mostrar código"
+    code-tools: false
+    embed-resources: true
+    css: style_duckDB_paletas.css
+    
+execute:
+  echo: true
+  warning: false
+  message: false
+  cache: false
+  
+---
+
+# El problema
+
+Imagina que trabajas en R y te solicitan analizar los atrasos en los envíos de una empresa de logística y distribución durante todo un año.
+
+Los datos que recibimos tienen las siguientes características:
+
+```{=html}
+<div class="problema-datos">
+
+  <div class="problema-tarjeta">
+    <div class="problema-numero">12</div>
+    <div class="problema-titulo">Archivos CSV</div>
+    <div class="problema-detalle">Uno por cada mes</div>
+  </div>
+
+  <div class="problema-tarjeta">
+    <div class="problema-numero">Millones</div>
+    <div class="problema-titulo">de registros</div>
+    <div class="problema-detalle">Un año de envíos</div>
+  </div>
+
+  <div class="problema-tarjeta">
+    <div class="problema-numero">426 MB</div>
+    <div class="problema-titulo">Datos en CSV</div>
+    <div class="problema-detalle">Tamaño aproximado</div>
+  </div>
+
+</div>
+```
+
+Una opción sería leer los 12 archivos, combinarlos en un único `data.frame` y comenzar el análisis. Sin embargo, al trabajar con volúmenes de datos cada vez mayores, cargar todos los registros en la memoria puede resultar costoso o incluso superar los recursos disponibles.
+
+Surge entonces una pregunta:
+
+> **¿Cómo podemos analizar estos datos desde
+ R sin tener que cargarlos todos previamente en la memoria?**
+
+En este tutorial utilizaremos **DuckDB** para abordar este problema.
+
+## ¿Qué es DuckDB?
+
+DuckDB es un sistema de gestión de bases de datos orientado al análisis de datos. Permite ejecutar consultas SQL directamente sobre distintas fuentes, incluidos archivos CSV y Parquet.
+
+DuckDB utiliza un motor de procesamiento analítico optimizado para ejecutar operaciones sobre grandes conjuntos de datos. Entre sus características destacan:
+
+- **Funcionamiento integrado**: se ejecuta dentro de la aplicación, sin necesidad de instalar, configurar ni administrar un servidor de bases de datos independiente.
+
+- **Procesamiento por columnas**: organiza internamente el trabajo sobre bloques de valores de varias filas, lo que permite realizar cálculos de manera eficiente.
+
+- **Ejecución de consultas SQL**: permite filtrar, agrupar, contar y calcular estadísticas sin escribir manualmente todas las operaciones en R.
+
+- **Gestión eficiente de memoria**: procesa los datos por bloques y puede utilizar almacenamiento temporal cuando ciertas operaciones superan la memoria disponible.
+
+En nuestro caso, esto significa que podemos utilizar DuckDB desde R para consultar los archivos **sin tener que leerlos y combinarlos previamente en un único data frame**. DuckDB realiza las operaciones solicitadas y R recibe el resultado de la consulta.
+
+Este es el flujo que utilizaremos para trabajar con DuckDB desde R:
+
+```{=html}
+<div class="duck-flow">
+
+  <div class="duck-card">
+    <div class="file-stack">
+      <span>CSV</span>
+      <span>CSV</span>
+      <span>CSV</span>
+    </div>
+    <strong>Múltiples archivos</strong>
+    <small>12 CSV · millones de registros</small>
+  </div>
+
+  <div class="duck-link">
+    <small>consulta SQL</small>
+    <span>→</span>
+  </div>
+
+  <div class="duck-card duck-center">
+    <strong class="duckdb-name">DuckDB</strong>
+    <div class="process-icon">⚙️</div>
+    <small>Consulta y procesa los archivos</small>
+  </div>
+
+  <div class="duck-link">
+    <small>resultado</small>
+    <span>→</span>
+  </div>
+
+  <div class="duck-card">
+    <div class="result-box">
+      <span>hora</span><span>atraso</span>
+      <span>08</span><span>7,8 %</span>
+      <span>17</span><span>25,4 %</span>
+    </div>
+    <strong>R</strong>
+    <small>Recibe solo lo necesario</small>
+  </div>
+
+</div>
+
+<style>
+.duck-flow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 2rem 0;
+}
+
+.duck-card {
+  flex: 1;
+  min-height: 190px;
+  border: 1px solid #dedede;
+  border-radius: 16px;
+  padding: 24px 18px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.duckdb-name {
+  font-size: 1.45rem !important;
+  margin-top: 0 !important;
+}
+
+.duck-card strong {
+  font-size: 1.05rem;
+  margin-top: 14px;
+}
+
+.duck-card small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  line-height: 1.35;
+}
+
+.duck-center {
+  background: #fffbea;
+  border-color: #f2d600;
+}
+
+.duck-link {
+  min-width: 90px;
+  text-align: center;
+  color: #777;
+}
+
+.duck-link small {
+  display: block;
+  white-space: nowrap;
+  font-size: .72rem;
+}
+
+.duck-link span {
+  display: block;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.file-stack {
+  display: flex;
+  gap: 5px;
+  align-items: flex-end;
+}
+
+.file-stack span {
+  border: 1px solid #cfcfcf;
+  border-radius: 5px;
+  padding: 9px 7px;
+  font-family: monospace;
+  font-size: .72rem;
+  background: #fafafa;
+}
+
+.file-stack span:nth-child(2) {
+  transform: translateY(-5px);
+}
+
+.process-icon {
+  margin: 10px 0 5px;
+  font-size: 2rem;
+  line-height: 1;
+  color: #555;
+}
+
+.result-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: monospace;
+  font-size: .68rem;
+}
+
+.result-box span {
+  padding: 4px 7px;
+  border-bottom: 1px solid #eee;
+}
+
+.result-box span:nth-child(odd) {
+  border-right: 1px solid #eee;
+}
+
+@media (max-width: 800px) {
+  .duck-flow {
+    flex-direction: column;
+  }
+
+  .duck-link span {
+    transform: rotate(90deg);
+  }
+}
+</style>
+```
+
+## El ejemplo que seguiremos
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-6}
+::: {.card .parte}
+**PARTE 1**
+
+### Consultar y analizar con DuckDB
+
+1. Consultar los archivos CSV con SQL desde DuckDB.
+2. Agrupar y resumir los datos para realizar un pequeño análisis.
+3. Medir cuánto tarda la consulta.
+:::
+:::
+
+::: {.g-col-12 .g-col-md-6}
+::: {.card .parte}
+**PARTE 2**
+
+### Formato y rendimiento
+
+Cambiaremos el foco: de **usar DuckDB** a **comparar su rendimiento**.
+
+1. Trabajar con los mismos datos en formato Parquet.
+2. Comparar el tiempo de ejecución de R+CSV, DuckDB+CSV y DuckDB+Parquet.
+:::
+:::
+:::
+
+# Preparación de los datos
+
+Para desarrollar el tutorial utilizaremos datos sintéticos de una empresa ficticia de logística y distribución.
+
+Cada fila representa un envío e incluye su fecha y hora de ingreso, región de origen y destino, tipo de envío, peso, distancia y un indicador de atraso. Para nuestro análisis serán especialmente importantes `hora_ingreso` y `atrasado`: indicador de atraso del envío.
+
+## Conocimientos previos
+
+Para seguir este tutorial es suficiente con que puedas:
+
+✓  Trabajar con objetos básicos en R.
+
+✓  Leer archivos CSV en R.
+
+✓  Realizar operaciones simples de manipulación de datos con `dplyr`.
+
+**No necesitas conocimientos previos de DuckDB ni SQL.** Las instrucciones de SQL necesarias se explicarán a medida que aparezcan.
+
+## Paquetes necesarios
+
+Utilizaremos `duckdb` y `DBI` para consultar los archivos con DuckDB, `readr` y `dplyr` para comparar este flujo con el procesamiento habitual en R, y `ggplot2` para visualizar los resultados. El código que genera los datos utiliza además `lubridate`.
+
+::: {.para-ti}
+Si alguno de estos paquetes no está instalado, puedes instalarlo una sola vez desde tu consola con:
+
+```{r}
+#| eval: false
+
+install.packages(c("duckdb", "DBI", "dplyr", "readr", "lubridate", "ggplot2"))
+```
+:::
+
+<div style="height: 30px;"></div>
+
+A lo largo del tutorial utilizaremos la forma `paquete::funcion()` para identificar directamente de qué paquete proviene cada función.
+
+::: {.callout-warning icon="false"}
+## Antes de ejecutar
+
+La primera ejecución puede tardar algunos minutos y requiere espacio disponible en disco. Los archivos creados no necesitan conservarse: pueden eliminarse y volver a generarse ejecutando nuevamente el código.
+:::
+
+El siguiente código genera los 12 archivos CSV utilizados en el tutorial y los guarda en una carpeta llamada `datos_csv/`, dentro del directorio de trabajo desde el que se ejecuta el documento. Esta será la ruta que utilizaremos más adelante para consultarlos con DuckDB. Como el código solo prepara los datos, **no necesitas comprender cada una de sus instrucciones para continuar**.
+
+```{r}
+#| label: generar-datos
+#| code-fold: true
+
+set.seed(421)
+
+dir.create(
+    "datos_csv",
+    showWarnings = FALSE
+)
+
+archivos_esperados <- sprintf(
+    "datos_csv/envios_2025_%02d.csv",
+    1:12
+)
+
+if (all(file.exists(archivos_esperados))) {
+
+    message(
+        "Los 12 archivos CSV ya existen. Se utilizarán los archivos existentes."
+    )
+
+} else {
+
+    meses <- 1:12
+
+    factor_mensual <- c(
+      0.92, 0.88, 0.94, 0.97,
+      1.00, 1.02, 1.04, 1.01,
+      1.06, 1.10, 1.18, 1.32
+    )
+
+    variacion <- runif(12, 0.97, 1.03)
+
+    n_envios <- round(
+      470000 * factor_mensual * variacion
+    )
+
+    regiones <- c(
+      "Valparaiso",
+      "Metropolitana",
+      "O'Higgins",
+      "Maule",
+      "Biobio",
+      "La Araucania",
+      "Los Lagos"
+    )
+
+    prob_regiones <- c(
+      0.15,
+      0.42,
+      0.08,
+      0.07,
+      0.13,
+      0.07,
+      0.08
+    )
+
+    for (mes in meses) {
+
+      n <- n_envios[mes]
+
+      inicio_mes <- as.Date(
+        sprintf("2025-%02d-01", mes)
+      )
+
+      fin_mes <- lubridate::ceiling_date(
+        inicio_mes,
+        "month"
+      ) - lubridate::days(1)
+
+      fecha_ingreso <- sample(
+        seq(inicio_mes, fin_mes, by = "day"),
+        n,
+        replace = TRUE
+      )
+
+      hora_decimal <- rnorm(
+        n,
+        mean = 14.2,
+        sd = 3.1
+      )
+
+      hora_decimal <- pmin(
+        pmax(hora_decimal, 7),
+        21.99
+      )
+
+      hora <- floor(hora_decimal)
+
+      minuto <- floor(
+        (hora_decimal - hora) * 60
+      )
+
+      hora_ingreso <- sprintf(
+        "%02d:%02d",
+        hora,
+        minuto
+      )
+
+      region_origen <- sample(
+        regiones,
+        n,
+        replace = TRUE,
+        prob = prob_regiones
+      )
+
+      region_destino <- sample(
+        regiones,
+        n,
+        replace = TRUE,
+        prob = prob_regiones
+      )
+
+      tipo_envio <- sample(
+        c("Estandar", "Express"),
+        n,
+        replace = TRUE,
+        prob = c(0.78, 0.22)
+      )
+
+      peso_kg <- rlnorm(
+        n,
+        meanlog = log(1.8),
+        sdlog = 0.8
+      )
+
+      peso_kg <- round(
+        pmin(pmax(peso_kg, 0.1), 30),
+        2
+      )
+
+      distancia_km <- rlnorm(
+        n,
+        meanlog = log(180),
+        sdlog = 0.75
+      )
+
+      distancia_km <- round(
+        pmin(pmax(distancia_km, 10), 1200)
+      )
+
+      prob_atraso <- 0.055 +
+        0.000035 * distancia_km +
+        ifelse(tipo_envio == "Estandar", 0.025, 0) +
+        ifelse(hora_decimal >= 17, 0.19, 0) +
+        ifelse(hora_decimal >= 19, 0.05, 0)
+
+      prob_atraso <- pmin(
+        prob_atraso,
+        0.65
+      )
+
+      atrasado <- rbinom(
+        n,
+        size = 1,
+        prob = prob_atraso
+      )
+
+      datos_mes <- tibble::tibble(
+        id_envio = sprintf(
+          "ENV2025%02d%07d",
+          mes,
+          seq_len(n)
+        ),
+        fecha_ingreso = fecha_ingreso,
+        hora_ingreso = hora_ingreso,
+        region_origen = region_origen,
+        region_destino = region_destino,
+        tipo_envio = tipo_envio,
+        peso_kg = peso_kg,
+        distancia_km = distancia_km,
+        atrasado = atrasado
+      )
+
+      archivo <- sprintf(
+        "datos_csv/envios_2025_%02d.csv",
+        mes
+      )
+
+      readr::write_csv(
+        datos_mes,
+        archivo
+      )
+
+      message(
+        sprintf(
+          "Mes %02d: %s envios",
+          mes,
+          format(
+            n,
+            big.mark = ".",
+            decimal.mark = ",",
+            scientific = FALSE
+          )
+        )
+      )
+
+      rm(datos_mes)
+      gc()
+    }
+}
+```
+
+Una vez generados los archivos, podemos comenzar a consultarlos directamente con DuckDB.
+
+::: {.inicio-parte}
+**PARTE 1** · Consultar y analizar con DuckDB
+:::
+
+# Consultar múltiples archivos con DuckDB
+
+Para empezar a trabajar con DuckDB desde R, primero creamos una conexión:
+
+```{r}
+#| label: conectar-duckdb
+#| cache: false
+
+con <- DBI::dbConnect(duckdb::duckdb())
+```
+
+## Los 12 archivos como una sola fuente de datos
+
+DuckDB puede consultar varios archivos que comparten la misma estructura utilizando un patrón en la ruta. En este caso:
+
+`datos_csv/envios_2025_*.csv`
+
+El símbolo `*` permite incluir los 12 archivos mensuales en una misma consulta.
+
+La función `read_csv_auto()` permite que DuckDB lea los archivos CSV e infiera automáticamente la estructura de sus columnas.
+
+Como las consultas a DuckDB se escriben en SQL, conviene conocer algunas de sus instrucciones básicas.
+Si no estás familiarizado con SQL, puedes desplegar la siguiente mini guía para consultar sus instrucciones básicas antes de continuar.
+
+
+::: {.callout-tip .mini-sql collapse="true" icon="false"}
+
+## Mini guía de SQL
+
+**Instrucciones básicas de SQL**
+
+| Instrucción | ¿Qué hace? | Ejemplo |
+|---|---|---|
+| `SELECT` | Indica qué columnas o resultados queremos obtener. | `SELECT hora_ingreso` |
+| `FROM` | Indica de dónde se obtienen los datos. | `FROM tabla` |
+| `WHERE` | Filtra las filas según una condición. | `WHERE atrasado = 1` |
+| `GROUP BY` | Agrupa filas para calcular resultados por grupo. | `GROUP BY hora` |
+| `ORDER BY` | Ordena el resultado. | `ORDER BY hora` |
+| `AS` | Asigna un nombre a una columna o resultado. | `COUNT(*) AS total_envios` |
+| `LIMIT` | Limita el número de filas mostradas. | `LIMIT 5` |
+| `DESCRIBE` | Muestra la estructura y los tipos de las columnas. | `DESCRIBE SELECT ...` |
+
+**Funciones que aparecen en las consultas**
+
+| Función | ¿Qué hace? | Ejemplo |
+|---|---|---|
+| `COUNT()` | Cuenta registros. | `COUNT(*)` |
+| `SUM()` | Suma los valores de una columna. | `SUM(atrasado)` |
+| `AVG()` | Calcula el promedio. | `AVG(atrasado)` |
+| `EXTRACT()` | Extrae una parte de una fecha u hora. | `EXTRACT(HOUR FROM hora_ingreso)` |
+
+:::
+
+Para ejecutar una consulta SQL desde R utilizamos `DBI::dbGetQuery()`. Esta función recibe la conexión a DuckDB (`con`) y una cadena de texto (*string*) que contiene la consulta escrita en SQL.
+
+Dentro de esa consulta podemos combinar instrucciones propias del lenguaje SQL con funciones específicas de DuckDB, como `read_csv_auto()`.
+
+**Observa en el siguiente ejemplo cómo R envía la consulta, DuckDB la ejecuta y devuelve el resultado.**
+
+### Contar el total de registros
+
+Comenzamos contando cuántos registros contienen en total:
+
+```{r}
+#| label: contar_envios
+
+total_envios <- DBI::dbGetQuery(
+    con,
+    "
+    SELECT COUNT(*) AS total_envios
+    FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+    "
+)
+total_envios
+```
+En esta consulta:
+
+- `SELECT COUNT(*)` cuenta el total de registros;
+- `AS total_envios` asigna el nombre `total_envios` al resultado del conteo;
+- `FROM read_csv_auto(...)` indica que los datos se obtienen directamente de los archivos CSV mediante una función de DuckDB.
+
+DuckDB encuentra **`r format(total_envios$total_envios, big.mark = ".", decimal.mark = ",", scientific = FALSE)` registros** entre los 12 archivos.
+
+**¿Qué ocurre si hacemos el conteo directamente en R?**
+
+Para obtener el mismo resultado siguiendo un flujo habitual en R, podemos leer los 12 archivos con `readr`, unirlos con `dplyr` y luego contar las filas:
+
+```{r}
+#| label: contar-envios-r
+#| code-fold: true
+#| eval: false
+
+# Este bloque no se ejecuta al renderizar porque
+# crea un objeto de gran tamaño en la memoria de R.
+
+archivos <- list.files(
+    "datos_csv",
+    pattern = "\\.csv$",
+    full.names = TRUE
+)
+
+datos <- dplyr::bind_rows(
+    lapply(
+        archivos,
+        readr::read_csv,
+        show_col_types = FALSE
+    )
+)
+
+total_envios_r <- nrow(datos)
+
+total_envios_r
+
+format(object.size(datos), units = "MiB")
+```
+
+Puedes ejecutar el código y hacer la prueba por ti mismo. Antes de correrlo, solo tienes que quitar `#| eval: false`.
+
+Así podrás **darte una idea de cuánto tienes que esperar para que R cargue los datos** y comprobar cuánto espacio ocupa el objeto `datos` en la memoria. 
+
+El procedimiento con `readr` y `dplyr` obtiene el mismo conteo, pero antes tiene que crear `datos` en la memoria de R. Con DuckDB, en cambio, R solo recibió el resultado de la consulta.
+
+::: {.para-ti}
+**La idea importante**
+
+La diferencia no está en el conteo obtenido, sino en **qué datos llegan a R antes de obtenerlo**.
+
+- **DuckDB:** los 12 archivos → consulta → `total_envios` (**1 × 1**) → R.
+- **`readr` + `dplyr`:** los 12 archivos → `datos` (**5.858.848 × 9; ≈ 849 MiB en R**) → conteo.
+
+Con DuckDB no fue necesario crear en R el `data.frame` con los 5.858.848 registros para responder esta pregunta.
+:::
+
+### Explorar la estructura de los datos
+
+Antes de comenzar el análisis, veamos cómo DuckDB interpretó la estructura de los datos:
+
+```{r}
+#| label: estructura_datos
+
+estructura <- DBI::dbGetQuery(
+    con,
+    "
+    DESCRIBE
+    SELECT *
+    FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+    "
+)
+estructura
+```
+
+DuckDB reconoce, entre otros, campos de tipo `DATE`, `TIME`, `DOUBLE` y `BIGINT`. Esto será útil más adelante, por ejemplo, cuando extraigamos directamente la hora desde `hora_ingreso`.
+
+### Ver una muestra de los registros
+
+Finalmente, veamos una pequeña muestra de los registros:
+
+```{r}
+#| label: muestra-datos
+
+muestra <- DBI::dbGetQuery(
+    con,
+    "
+    SELECT *
+        FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+    LIMIT 5
+    "
+)
+muestra
+```
+
+Hasta aquí hemos explorado cómo DuckDB accede a los archivos, cuántos registros contienen y cómo están estructurados. Ahora usemos este flujo para responder una pregunta concreta sobre los datos.
+
+> **¿La hora en que ingresa un envío está relacionada con la proporción de atrasos?**
+
+La variable `atrasado` toma el valor `0` cuando el envío fue entregado dentro del plazo comprometido y `1` cuando fue entregado con atraso.
+
+### Calcular la proporción global de atrasos
+
+Antes de estudiar la hora de ingreso, veamos primero cuál es la proporción global de envíos atrasados.
+
+```{r}
+#| label: proporcion-atrasos
+
+resumen_atrasos <- DBI::dbGetQuery(
+    con,
+    "
+    SELECT
+        COUNT(*) AS total_envios, 
+        SUM(atrasado) AS envios_atrasados,
+        AVG(atrasado) * 100 AS porcentaje_atrasados
+    FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+    "
+)
+resumen_atrasos
+```
+
+En el conjunto completo, aproximadamente el **12,1 % de los envíos presenta atraso.** Utilizaremos este valor como referencia al comparar las distintas horas del día.
+
+### Analizar los atrasos por hora
+
+En lugar de importar todos los registros a R, puedes pedirle a DuckDB que realice directamente la agrupación.
+
+La siguiente consulta:
+
+- selecciona la información que queremos obtener;
+- extrae la hora desde `hora_ingreso` y llama `hora` a esa nueva columna;
+- cuenta el total de envíos y llama `total_envios` a ese resultado;
+- calcula el porcentaje de envíos atrasados y llama `porcentaje_atrasados` a ese resultado;
+- toma como fuente los archivos CSV de `datos_csv`;
+- agrupa los registros por `hora`;
+- ordena el resultado por `hora`.
+
+
+```{r}
+#| label: atrasos-por-hora
+
+atrasos_por_hora <- DBI::dbGetQuery(
+    con,
+    "
+    SELECT
+        EXTRACT(HOUR FROM hora_ingreso) AS hora,
+        COUNT(*) AS total_envios,
+        AVG(atrasado) * 100 AS porcentaje_atrasados
+    FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+    GROUP BY hora
+    ORDER BY hora 
+    "
+)
+atrasos_por_hora
+```
+
+Ahora veamos ese resultado en un gráfico:
+
+```{r}
+#| label: grafico-atrasos-hora
+#| code-fold: true
+#| fig-width: 9
+#| fig-height: 4.5
+
+grafico_atrasos <- ggplot2::ggplot(
+  atrasos_por_hora,
+  ggplot2::aes(
+    x = hora,
+    y = porcentaje_atrasados,
+    group = 1,
+    text = paste0(
+  "Hora de ingreso: ", hora, ":00",
+  "<br>Total de envíos: ",
+  format(
+    total_envios,
+    big.mark = ".",
+    decimal.mark = ",",
+    scientific = FALSE,
+    trim = TRUE
+  ),
+  "<br>Envíos atrasados: ",
+  format(
+    round(porcentaje_atrasados, 2),
+    decimal.mark = ",",
+    nsmall = 2
+  ), "%"
+)
+  )
+) +
+  ggplot2::geom_line(
+    ggplot2::aes(group = 1),
+    linewidth = 1,
+    color = "grey40"
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks = 7:21
+  ) +
+  ggplot2::scale_y_continuous(
+    labels = function(x) paste0(x, "%")
+  ) +
+  ggplot2::labs(
+    x = "Hora de ingreso",
+    y = "Envíos atrasados (%)",
+    title = "Porcentaje de atrasos según hora de ingreso"
+  ) +
+  ggplot2::theme_minimal(base_size = 12) +
+  ggplot2::theme(
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major.x = ggplot2::element_blank(),
+    plot.title = ggplot2::element_text(face = "bold")
+  )
+
+
+```
+
+Una vez construido el gráfico con `ggplot2`, podemos convertirlo en una visualización interactiva mediante `plotly::ggplotly()`, sin tener que crearlo nuevamente.
+
+Al pasar el cursor sobre la línea, podremos consultar la hora de ingreso, el total de envíos registrados y el porcentaje de atrasos correspondiente.
+
+```{r}
+#| label: plotly-atrasos-hora
+#| code-fold: true
+#| fig-width: 9
+#| fig-height: 4.5
+grafico_atrasos_interactivo <- plotly::ggplotly(
+  grafico_atrasos,
+  tooltip = "text"
+) |>
+  plotly::layout(
+    hoverlabel = list(
+      bgcolor = "white",
+      bordercolor = "#D6DCE2",
+      font = list(
+        family = "Arial",
+        size = 13,
+        color = "#30343B"
+      ),
+      align = "left"
+    ),
+    hovermode = "closest"
+  ) |>
+  plotly::config(
+    displayModeBar = FALSE
+  )
+
+```
+```{r}
+#| label: mostrar-atrasos-interactivo
+grafico_atrasos_interactivo
+```
+
+<div style="height: 30px;"></div>
+
+Hasta las 16:00, la proporción de atrasos se mantiene cercana al 8 %. A partir de las 17:00 comienza a aumentar y desde las 19:00 supera el 30 %.
+
+Por lo tanto, en estos datos existe una **asociación entre la hora de ingreso y la proporción de atrasos**. Esta comparación es descriptiva: no permite concluir que la hora de ingreso sea, por sí sola, la causa del atraso.
+
+::: {.para-ti}
+**¿Qué conseguimos?**
+
+DuckDB realizó la **agrupación y los cálculos por hora** y devolvió en R un resumen de solo **15 filas** que llamamos `atrasos_por_hora`. A partir de ese objeto pudimos continuar trabajando directamente en R y construir el gráfico.
+:::
+
+## ¿Cuánto tarda esta consulta?
+
+Como vamos a usar esta misma consulta varias veces, primero la guardaremos en un objeto de R. Así no tendremos que volver a escribirla cada vez.
+
+```{r}
+#| label: consulta-sql-csv
+
+consulta_sql_csv <- "
+SELECT
+    EXTRACT(HOUR FROM hora_ingreso) AS hora,
+    COUNT(*) AS total_envios,
+    AVG(atrasado) * 100 AS porcentaje_atrasados
+FROM read_csv_auto('datos_csv/envios_2025_*.csv')
+GROUP BY hora
+ORDER BY hora
+"
+```
+
+Por ahora solo guardamos la consulta SQL en el objeto `consulta_sql_csv`; todavía no la hemos ejecutado.
+
+Ahora podemos usar ese objeto para medir cuánto tarda DuckDB en ejecutar la consulta:
+
+```{r}
+#| label: tiempo-consulta-csv
+
+tiempo_csv <- system.time({
+    DBI::dbGetQuery(con, consulta_sql_csv)
+})
+
+tiempo_csv
+```
+De los tres tiempos que muestra system.time(), nos interesa elapsed, que indica el tiempo real transcurrido durante la ejecución de la consulta.
+
+Esta es una sola medición; más adelante repetiremos la comparación.
+
+Hasta aquí nos hemos concentrado en usar DuckDB para consultar y analizar los datos.
+
+**Ahora cambiaremos el foco**: veremos cómo influye el formato de almacenamiento en el rendimiento y compararemos distintas formas de realizar la misma tarea.
+
+::: {.inicio-parte}
+**PARTE 2** · Formato y rendimiento
+:::
+
+# Del formato CSV a Parquet
+
+Hasta ahora DuckDB ha trabajado directamente sobre los 12 archivos CSV. Sin embargo, CSV no es el único formato disponible para almacenar datos.
+
+**Parquet** es un formato de almacenamiento columnar: en lugar de organizar la información principalmente por filas, almacena los valores de cada columna de una forma que facilita trabajar con datos estructurados y conserva información sobre sus tipos.
+
+Esto puede ser especialmente útil cuando una consulta necesita utilizar solamente algunas columnas de un conjunto de datos grande.
+
+Para comparar ambos formatos en las mismas condiciones, vamos a convertir cada uno de los archivos CSV en archivos Parquet. 
+
+Cuando ejecutes el siguiente código, se generarán **12 archivos Parquet** dentro de una carpeta llamada `datos_parquet/`.
+
+```{r}
+#| label: convertir-parquet
+#| code-fold: true
+
+dir.create(
+    "datos_parquet",
+    showWarnings = FALSE
+)
+
+parquet_esperados <- sprintf(
+    "datos_parquet/envios_2025_%02d.parquet",
+    1:12
+)
+
+if (all(file.exists(parquet_esperados))) {
+    message("Los 12 archivos Parquet ya existen. Se utilizarán los archivos existentes.")
+} else {
+
+    for (mes in 1:12) {
+
+        archivo_csv <- sprintf(
+            "datos_csv/envios_2025_%02d.csv",
+            mes
+        )
+
+        archivo_parquet <- sprintf(
+            "datos_parquet/envios_2025_%02d.parquet",
+            mes
+        )
+
+        consulta <- sprintf(
+            "
+            COPY (
+                SELECT *
+                FROM read_csv_auto('%s')
+            )
+            TO '%s'
+            (FORMAT PARQUET)
+            ",
+            archivo_csv,
+            archivo_parquet
+        )
+
+        DBI::dbExecute(
+            con,
+            consulta
+        )
+    }
+}
+```
+
+## ¿Ocupan el mismo espacio?
+
+Antes de repetir nuestra consulta, veamos cuánto espacio ocupan en disco los mismos registros almacenados en ambos formatos.
+
+```{r}
+#| label: comparar_tamaño-archivos
+#| code-fold: false
+
+tamano_csv <- sum(file.info(list.files(
+            "datos_csv",pattern = "\\.csv$", full.names = TRUE))$size) / 1024^2
+
+tamano_parquet <- sum(file.info(list.files(
+            "datos_parquet",pattern = "\\.parquet$", full.names = TRUE))$size) / 1024^2
+
+```
+
+```{r}
+#| output: asis
+#| echo: false
+# Comparación de almacenamiento
+reduccion <- 100 * (1 - tamano_parquet / tamano_csv)
+
+formato_mb <- function(x) {
+    paste0(
+        format(round(x, 1), decimal.mark = ",", nsmall = 1),
+        " MB"
+    )
+}
+
+barra_csv <- 100
+barra_parquet <- 100 * tamano_parquet / tamano_csv
+
+html_almacenamiento <- sprintf(
+    '
+<div class="comparacion-almacenamiento">
+  <h3>Tamaño de almacenamiento por formato</h3>
+  <p class="comparacion-subtitulo">
+    Comparación de los mismos datos en dos formatos
+  </p>
+
+  <div class="comparacion-fila">
+    <span>CSV</span>
+    <span>%s</span>
+  </div>
+  <div class="comparacion-fondo">
+    <div class="comparacion-barra csv" style="width: %.2f%%;"></div>
+  </div>
+
+  <div class="comparacion-fila">
+    <span>Parquet</span>
+    <span>%s</span>
+  </div>
+  <div class="comparacion-fondo">
+    <div class="comparacion-barra parquet" style="width: %.2f%%;"></div>
+  </div>
+
+  <p class="comparacion-resultado">
+    Parquet ocupa aproximadamente un %.1f%% menos espacio.
+  </p>
+</div>
+',
+    formato_mb(tamano_csv),
+    barra_csv,
+    formato_mb(tamano_parquet),
+    barra_parquet,
+    reduccion
+)
+
+htmltools::HTML(html_almacenamiento)
+```
+
+
+En esta ejecución, Parquet requiere considerablemente menos espacio que CSV. Esta diferencia corresponde a este conjunto de datos y no debe interpretarse como una reducción fija para cualquier base.
+
+## La misma consulta sobre Parquet
+
+Ahora haremos exactamente la misma pregunta, pero sobre los archivos Parquet.
+
+Como la lógica no cambia, podemos reutilizar la misma consulta cambiando la fuente de los datos. Esta vez utilizaremos `read_parquet()`:
+
+```{r}
+#| label: consulta-sql-parquet
+
+consulta_sql_parquet <- "
+SELECT
+    EXTRACT(HOUR FROM hora_ingreso) AS hora,
+    COUNT(*) AS total_envios,
+    AVG(atrasado) * 100 AS porcentaje_atrasados
+FROM read_parquet('datos_parquet/envios_2025_*.parquet')
+GROUP BY hora
+ORDER BY hora
+"
+```
+
+Ahora podemos ejecutar la consulta y guardar el resultado en R:
+
+```{r}
+#| label: atrasos-por-hora-parquet
+
+atrasos_por_hora_parquet <- DBI::dbGetQuery(
+    con,
+    consulta_sql_parquet
+)
+
+```
+
+Como los archivos Parquet contienen los mismos datos que los CSV, obtenemos el mismo resumen; **lo que cambió fue el formato de almacenamiento y la forma de leerlo, no la pregunta ni los datos**.
+
+También podemos medir cuánto tarda DuckDB en ejecutar esta consulta:
+
+```{r}
+#| label: tiempo-consulta-parquet
+
+tiempo_parquet <- system.time({
+    DBI::dbGetQuery(con, consulta_sql_parquet)
+})
+
+tiempo_parquet
+```
+El tiempo real transcurrido durante la ejecución de la consulta es el tiempo elapsed.
+
+En esta ejecución, Parquet tardó menos que CSV, pero sigue siendo una sola medición.
+
+Como una sola medición no es suficiente para comparar los métodos, ahora repetiremos la misma tarea varias veces y compararemos los resultados.
+
+# ¿Cuándo vale la pena usar DuckDB?
+
+Ya vimos que DuckDB permite realizar las operaciones directamente sobre los archivos y llevar a R solamente el resultado necesario. Ahora compararemos cuánto tarda la misma tarea con tres alternativas:
+
+| Método | Procesamiento | Formato |
+|---|---|---|
+| R + CSV | R | CSV |
+| DuckDB + CSV | DuckDB | CSV |
+| DuckDB + Parquet | DuckDB | Parquet |
+
+Esto permite observar por separado dos cambios: **R frente a DuckDB utilizando los mismos archivos CSV**, y **CSV frente a Parquet utilizando DuckDB**.
+
+## Comparación de tiempos
+
+Una sola ejecución puede verse afectada por variaciones del sistema. Por eso ejecutaremos **cinco veces cada método**.
+
+Esta prueba comparativa de rendimiento se conoce como **benchmark**: realizaremos la misma tarea con cada método y compararemos sus tiempos de ejecución.
+
+Primero, veamos cuánto tarda DuckDB al trabajar con CSV y con Parquet:
+
+```{r}
+#| label: benchmark-duckdb
+
+tiempos_duckdb_csv <- numeric(5)
+tiempos_duckdb_parquet <- numeric(5)
+
+for (i in 1:5) {
+
+    tiempos_duckdb_csv[i] <- system.time({
+        DBI::dbGetQuery(con, consulta_sql_csv)
+    })["elapsed"]
+
+    tiempos_duckdb_parquet[i] <- system.time({
+        DBI::dbGetQuery(con, consulta_sql_parquet)
+    })["elapsed"]
+}
+```
+
+Ahora hacemos la misma tarea directamente en R. Recordemos que los 12 archivos CSV se leen y combinan en R antes de calcular el resumen por hora.
+
+```{r}
+#| label: benchmark-r-csv
+#| code-fold: true
+
+tiempos_r_csv <- numeric(5)
+
+archivos_csv <- list.files(
+  "datos_csv",
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+for (i in 1:5) {
+
+  tiempos_r_csv[i] <- system.time({
+
+    datos_r <- lapply(
+      archivos_csv,
+      readr::read_csv,
+      show_col_types = FALSE
+    ) |>
+      dplyr::bind_rows()
+
+    atrasos_por_hora_r <- datos_r |>
+      dplyr::mutate(
+        hora = lubridate::hour(hora_ingreso)
+      ) |>
+      dplyr::group_by(hora) |>
+      dplyr::summarise(
+        total_envios = dplyr::n(),
+        porcentaje_atrasados = mean(atrasado) * 100,
+        .groups = "drop"
+      ) |>
+      dplyr::arrange(hora)
+
+  })["elapsed"]
+
+  rm(datos_r)
+  gc()
+}
+```
+
+## Comparación de los resultados
+
+Reunimos las cinco mediciones obtenidas con cada método en una sola tabla:
+
+```{r}
+#| label: resultados-benchmark
+
+resultados_benchmark <- data.frame(
+  repeticion = rep(1:5, 3),
+  metodo = rep(
+    c("R + CSV", "DuckDB + CSV", "DuckDB + Parquet"),
+    each = 5
+  ),
+  tiempo = c(
+    tiempos_r_csv,
+    tiempos_duckdb_csv,
+    tiempos_duckdb_parquet
+  )
+)
+```
+
+Como los tiempos pueden variar entre ejecuciones, utilizaremos la **mediana de las cinco repeticiones** como valor central para comparar los métodos. También conservaremos el mínimo y el máximo observados.
+
+```{r}
+#| label: resumen-benchmark
+#| code-fold: true
+
+resumen_benchmark <- resultados_benchmark |>
+  dplyr::group_by(metodo) |>
+  dplyr::summarise(
+    mediana = median(tiempo),
+    minimo = min(tiempo),
+    maximo = max(tiempo),
+    .groups = "drop"
+  )
+```
+
+```{r}
+resumen_benchmark
+```
+
+Para visualizar la diferencia entre los tres métodos, representemos sus tiempos medianos de ejecución:
+
+```{r}
+#| label: grafico-benchmark
+#| code-fold: true
+#| fig-width: 9
+#| fig-height: 5.5
+
+# Identificar el método más rápido
+metodo_rapido <- resumen_benchmark$metodo[
+  which.min(resumen_benchmark$mediana)
+]
+
+# Posición de las etiquetas al extremo derecho del gráfico
+posicion_etiquetas <- max(resumen_benchmark$mediana) * 1.15
+
+grafico_benchmark <- ggplot2::ggplot(
+  resumen_benchmark,
+  ggplot2::aes(
+    x = reorder(metodo, mediana),
+    y = mediana,
+    fill = metodo == metodo_rapido,
+    text = paste0(
+      "<b>", metodo, "</b>",
+      "<br><br>Tiempo mínimo: ",
+      format(round(minimo, 2),
+             decimal.mark = ",", nsmall = 2), " s",
+      "<br>Tiempo mediano: ",
+      format(round(mediana, 2),
+             decimal.mark = ",", nsmall = 2), " s",
+      "<br>Tiempo máximo: ",
+      format(round(maximo, 2),
+             decimal.mark = ",", nsmall = 2), " s"
+    )
+  )
+) +
+  ggplot2::geom_col(width = 0.65) +
+  ggplot2::geom_text(
+    data = resumen_benchmark,
+    mapping = ggplot2::aes(
+      x = reorder(metodo, mediana),
+      y = posicion_etiquetas,
+      label = paste0(
+        format(round(mediana, 2),
+               decimal.mark = ",",
+               nsmall = 2),
+        " s"
+      )
+    ),
+    inherit.aes = FALSE,
+    hjust = 1,
+    color = "grey30"
+  ) +
+  ggplot2::coord_flip() +
+  ggplot2::scale_y_continuous(
+    expand = ggplot2::expansion(mult = c(0, 0.20))
+  ) +
+  ggplot2::labs(
+    x = NULL,
+    y = "Tiempo mediano (segundos)",
+    title = "Tiempo de ejecución según método"
+  ) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    legend.position = "none",
+    panel.grid.major.x = ggplot2::element_blank(),
+    panel.grid.major.y = ggplot2::element_blank(),
+    panel.grid.minor = ggplot2::element_blank()
+  )
+```
+
+Una vez construido el gráfico con `ggplot2`, podemos convertirlo en una visualización interactiva utilizando `plotly::ggplotly()`, sin necesidad de crearlo nuevamente.
+
+Al pasar el cursor sobre cada barra, podremos consultar el tiempo mediano de ejecución de cada método, facilitando la comparación incluso cuando las diferencias de tiempo son muy grandes.
+
+```{r}
+#| label: plotly-benchmark
+#| code-fold: true
+#| fig-width: 9
+#| fig-height: 5.5
+
+grafico_benchmark_interactivo <- plotly::ggplotly(
+  grafico_benchmark,
+  tooltip = "text"
+) |>
+  plotly::layout(
+    hoverlabel = list(
+      bgcolor = "white",
+      bordercolor = "#D6DCE2",
+      font = list(
+        family = "Arial",
+        size = 13,
+        color = "#30343B"
+      ),
+      align = "left"
+    ),
+    hovermode = "closest",
+    hoverdistance = 40
+  ) |>
+  plotly::config(
+    displayModeBar = FALSE
+  )
+```
+
+```{r}
+#| label: mostrar-benchmark-interactivo
+grafico_benchmark_interactivo
+```
+
+
+<div style="height: 30px;"></div>
+
+Las cinco repeticiones muestran diferencias entre los tres métodos. En esta ejecución, **DuckDB sobre CSV requirió menos tiempo que R sobre los mismos archivos CSV**, mientras que **DuckDB sobre Parquet presentó el menor tiempo mediano**.
+
+En esta consulta, los cálculos dependen principalmente de las columnas `hora_ingreso` y `atrasado`, precisamente un caso en el que el almacenamiento columnar de Parquet puede resultar ventajoso.
+
+::: {.callout-warning icon="false"}
+## Los tiempos dependen del entorno
+
+Estos resultados corresponden a este conjunto de datos y al computador donde se ejecutó el tutorial. Los tiempos exactos pueden cambiar en otro equipo o en otra ejecución.
+
+La comparación no pretende establecer que un método será siempre una cantidad determinada de veces más rápido que otro, sino mostrar cómo la forma de procesar y almacenar los datos puede influir en el tiempo necesario para resolver una misma tarea.
+:::
+
+# Cerrar la conexión
+
+Al finalizar el trabajo, cerramos la conexión con DuckDB para liberar los recursos asociados a ella.
+
+```{r}
+#| label: cerrar-conexion
+#| cache: false
+
+DBI::dbDisconnect(con)
+DBI::dbIsValid(con)
+```
+
+El resultado `FALSE` confirma que la conexión ya no está activa.
+
+::: {.callout-tip collapse="true" icon="false"}
+# Resumen: usar DuckDB con tus propios datos
+
+Este es el flujo básico que puedes reutilizar cuando quieras trabajar con tus propios archivos.
+
+**1. Conectarse a DuckDB**
+
+Abre una conexión entre R y DuckDB.
+
+```r
+con <- DBI::dbConnect(duckdb::duckdb())
+```
+
+**2. Indicar dónde están los datos**
+
+Dentro de la consulta, indica la ubicación de tus archivos.
+
+Para CSV:
+
+```sql
+FROM read_csv_auto('ruta/a/tus_archivos/*.csv')
+```
+
+Para Parquet:
+
+```sql
+FROM read_parquet('ruta/a/tus_archivos/*.parquet')
+```
+
+**3. Consultar y procesar**
+
+Construye la consulta según lo que necesites obtener.
+
+```sql
+SELECT ...
+FROM ...
+WHERE ...
+GROUP BY ...
+ORDER BY ...
+```
+
+No es necesario utilizar todas estas instrucciones: dependerá de la consulta que quieras realizar.
+
+**4. Llevar el resultado a R**
+
+Ejecuta la consulta utilizando la conexión y guarda el resultado en un objeto de R.
+
+```r
+resultado <- DBI::dbGetQuery(con, "
+  SELECT ...
+  FROM read_csv_auto('ruta/a/tus_archivos/*.csv')
+  WHERE ...
+")
+```
+
+A partir de aquí, `resultado` puede utilizarse en R para continuar el análisis o construir visualizaciones.
+
+**5. Cerrar la conexión**
+
+Cuando termines de trabajar con DuckDB, cierra la conexión.
+
+```r
+DBI::dbDisconnect(con)
+```
+
+**Conectar → indicar los archivos → consultar y procesar → llevar el resultado a R → desconectar**
+
+:::
+
+# ¿Qué aprendimos?
+
+A lo largo del tutorial trabajamos con **millones de registros distribuidos en varios archivos** sin cargarlos completos en R.
+
+Cuando trabajamos con grandes volúmenes de información, puede ser más conveniente **realizar primero las operaciones necesarias sobre los datos y traer solamente el resultado que necesitamos**.
+
+**archivos → consulta SQL con DuckDB → resultado resumido → R**
+
+## Cuándo conviene DuckDB
+
+DuckDB resulta especialmente útil cuando:
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### 📁 Varios archivos
+
+Puedes consultarlos como una sola fuente sin tener que unirlos previamente en R.
+:::
+:::
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### 📊 Datos grandes
+
+Puedes realizar primero las operaciones necesarias y llevar a R solamente el resultado.
+:::
+:::
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### ⚡ Formato Parquet
+
+DuckDB puede aprovechar su almacenamiento columnar para determinadas consultas.
+:::
+:::
+
+:::
+
+<div style="height: 30px;"></div>
+
+Para conjuntos de datos pequeños que caben cómodamente en la memoria, trabajar directamente en R puede ser suficiente.
+
+## Cuándo DuckDB ya no basta
+
+DuckDB funciona en un solo computador y utiliza sus recursos, como memoria, procesador y disco. Puede no ser suficiente cuando:
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### 💾 Datos demasiado grandes
+
+Los datos superan lo que tu máquina puede procesar, según la memoria disponible y la consulta.
+:::
+:::
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### 🖥️ Varios computadores
+
+Necesitas distribuir el trabajo entre varios computadores para procesar los datos en paralelo.
+:::
+:::
+
+::: {.g-col-12 .g-col-md-4}
+::: {.card}
+### 👥 Escritura simultánea
+
+Muchas personas necesitan escribir datos al mismo tiempo.
+:::
+:::
+
+:::
+
+<div style="height: 30px;"></div>
+
+En esos casos existen otras herramientas, como Spark o bases de datos en la nube.
+
+
+
+# Referencias
+
+- DuckDB. *R Client*. Documentación oficial de DuckDB.  
+  <https://duckdb.org/docs/current/clients/r/>
+
+- DuckDB. *Reading Multiple Files*. Documentación oficial de DuckDB.  
+  <https://duckdb.org/docs/stable/data/multiple_files/overview.html>
+
+- DuckDB. *CSV Import*. Documentación oficial de DuckDB.  
+  <https://duckdb.org/docs/stable/data/csv/overview.html>
+
+- DuckDB. *Reading and Writing Parquet Files*. Documentación oficial de DuckDB.  
+  <https://duckdb.org/docs/current/data/parquet/overview>
+
+- Quarto. *HTML Options*. Documentación oficial de Quarto.  
+  <https://quarto.org/docs/reference/formats/html.html>
+
+```{=html}
+
+<footer class="studio-footer">
+
+  <div class="studio-footer-top">
+
+    <div>
+      <div class="studio-footer-title">
+        DuckDB desde R
+      </div>
+
+      <div class="studio-footer-subtitle">
+        Tutorial de análisis de datos · 2026
+      </div>
+    </div>
+
+    <nav class="studio-footer-actions"
+         aria-label="Enlaces del pie de página">
+
+      <a href="#quarto-content">
+        ↑ Volver arriba
+      </a>
+
+    </nav>
+
+  </div>
+
+  <div class="studio-footer-bottom">
+    Ana Gundermann · Ingeniería Civil Matemática
+  </div>
+
+</footer>
+
+```
