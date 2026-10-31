@@ -868,6 +868,7 @@ grafico_atrasos_interactivo <- plotly::ggplotly(
   )
 ```
 
+:::: {.grafico-tarjeta}
 
 ::: {.titulo-grafico}
 
@@ -880,6 +881,8 @@ grafico_atrasos_interactivo <- plotly::ggplotly(
 #| echo: false
 grafico_atrasos_interactivo
 ```
+
+:::
 
 <div style="height: 30px;"></div>
 
@@ -1377,6 +1380,7 @@ grafico_benchmark_interactivo <- plotly::ggplotly(
   )
 ```
 
+:::: {.grafico-tarjeta}
 
 ::: {.titulo-grafico}
 
@@ -1391,6 +1395,7 @@ grafico_benchmark_interactivo <- plotly::ggplotly(
 grafico_benchmark_interactivo
 ```
 
+:::
 
 <div style="height: 30px;"></div>
 

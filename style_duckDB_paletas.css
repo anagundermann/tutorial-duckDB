@@ -248,10 +248,21 @@ main.content .card h3::after {
   border-left: 4px solid var(--studio-accent) !important;
 }
 
+
+
 .inicio-parte {
   margin: 1.5rem 0;
   font-weight: 600;
+  padding: 1.6rem 1.3rem;
 }
+
+.inicio-parte p {
+  margin: 0;
+}
+
+
+
+
 
 .inicio-parte strong {
   color: var(--studio-accent);
@@ -569,28 +580,56 @@ table thead {
 
 /* TÍTULOS EXTERNOS DE GRÁFICOS PLOTLY */
 
-.titulo-grafico {
+
+/* TARJETA QUE UNE EL TÍTULO Y EL GRÁFICO */
+
+.grafico-tarjeta {
+  background: var(--studio-surface);
+  /* Fondo blanco */
+  border: 1px solid var(--studio-line);
+  /* Borde suave */
+  border-radius: 14px;
+  /* Esquinas redondeadas */
+  box-shadow: 0 8px 25px var(--studio-shadow);
+  padding: 14px 12px 24px;
+  /* Arriba 14px, lados 12px, abajo 24px */
+  /* Espacio interior */
+  margin: 1.5rem 0;
+  /* Separación respecto al contenido */
+}
+
+/* TÍTULO DEL GRÁFICO EN COMPUTADOR */
+
+.grafico-tarjeta .titulo-grafico {
   text-align: center;
   font-size: 21px;
   font-weight: 700;
   line-height: 1.4;
   color: #30343B;
-  margin: 25px 0 12px;
+  margin: 0;
 }
 
-.titulo-grafico p {
+/* ELIMINAR ESPACIOS INNECESARIOS */
+
+.grafico-tarjeta .titulo-grafico p {
   margin: 0;
+}
+
+.grafico-tarjeta .cell {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 /* ADAPTACIÓN PARA CELULARES */
 
 @media (max-width: 700px) {
-
-  .titulo-grafico {
-    text-align: left;
-    font-size: 17px;
-    line-height: 1.4;
-    margin: 20px 0 12px;
+  .grafico-tarjeta {
+    padding: 12px 6px 20px;
+    /* Arriba 12px, lados 6px, abajo 20px */
   }
 
+  .grafico-tarjeta .titulo-grafico {
+    text-align: left;
+    font-size: 17px;
+  }
 }
