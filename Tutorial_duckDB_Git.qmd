@@ -69,13 +69,73 @@ DuckDB es un sistema de gestión de bases de datos orientado al análisis de dat
 
 DuckDB utiliza un motor de procesamiento analítico optimizado para ejecutar operaciones sobre grandes conjuntos de datos. Entre sus características destacan:
 
-- **Funcionamiento integrado**: se ejecuta dentro de la aplicación, sin necesidad de instalar, configurar ni administrar un servidor de bases de datos independiente.
 
-- **Procesamiento por columnas**: organiza internamente el trabajo sobre bloques de valores de varias filas, lo que permite realizar cálculos de manera eficiente.
+```{=html}
+<ul class="duckdb-caracteristicas">
 
-- **Ejecución de consultas SQL**: permite filtrar, agrupar, contar y calcular estadísticas sin escribir manualmente todas las operaciones en R.
+  <li class="duckdb-rasgo">
+    <span class="duckdb-icono">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="4" width="19" height="16" rx="2.5"/>
+        <path d="M2.5 8.5h19"/>
+        <ellipse cx="12" cy="12.3" rx="4.5" ry="1.5"/>
+        <path d="M7.5 12.3v4c0 .9 2 1.7 4.5 1.7s4.5-.8 4.5-1.7v-4"/>
+      </svg>
+    </span>
+    <div class="duckdb-rasgo-texto">
+      <strong>Funcionamiento integrado</strong>
+      <p>Se ejecuta dentro de la aplicación, sin necesidad de instalar, configurar ni administrar un servidor de bases de datos independiente.</p>
+    </div>
+  </li>
 
-- **Gestión eficiente de memoria**: procesa los datos por bloques y puede utilizar almacenamiento temporal cuando ciertas operaciones superan la memoria disponible.
+  <li class="duckdb-rasgo">
+    <span class="duckdb-icono">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect class="duckdb-icono-relleno" x="9" y="4" width="6" height="16" rx=".5"/>
+        <rect x="2.5" y="4" width="19" height="16" rx="2"/>
+        <path d="M2.5 9h19M9 4v16M15 4v16"/>
+      </svg>
+    </span>
+    <div class="duckdb-rasgo-texto">
+      <strong>Procesamiento por columnas</strong>
+      <p>Organiza internamente el trabajo sobre bloques de valores de varias filas, lo que permite realizar cálculos de manera eficiente.</p>
+    </div>
+  </li>
+
+  <li class="duckdb-rasgo">
+    <span class="duckdb-icono">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="4" width="19" height="16" rx="2.5"/>
+        <path d="M2.5 8.5h19"/>
+        <text x="5.4" y="16.4" font-size="7.2" font-weight="800"
+              stroke="none" fill="currentColor">SQL</text>
+      </svg>
+    </span>
+    <div class="duckdb-rasgo-texto">
+      <strong>Ejecución de consultas SQL</strong>
+      <p>Permite filtrar, agrupar, contar y calcular estadísticas sin escribir manualmente todas las operaciones en R.</p>
+    </div>
+  </li>
+
+  <li class="duckdb-rasgo">
+    <span class="duckdb-icono">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="7" width="19" height="10" rx="2"/>
+        <rect class="duckdb-icono-relleno" x="6" y="9.5" width="3" height="5" rx=".5"/>
+        <rect class="duckdb-icono-relleno" x="11" y="9.5" width="3" height="5" rx=".5"/>
+        <rect class="duckdb-icono-relleno" x="16" y="9.5" width="2.5" height="5" rx=".5"/>
+        <path d="M6 17v3M10 17v3M14 17v3M18 17v3"/>
+      </svg>
+    </span>
+    <div class="duckdb-rasgo-texto">
+      <strong>Gestión eficiente de memoria</strong>
+      <p>Procesa los datos por bloques y puede utilizar almacenamiento temporal cuando ciertas operaciones superan la memoria disponible.</p>
+    </div>
+  </li>
+
+</ul>
+```
+
 
 En nuestro caso, esto significa que podemos utilizar DuckDB desde R para consultar los archivos **sin tener que leerlos y combinarlos previamente en un único data frame**. DuckDB realiza las operaciones solicitadas y R recibe el resultado de la consulta.
 
@@ -1142,11 +1202,15 @@ Como una sola medición no es suficiente para comparar los métodos, ahora repet
 
 Ya vimos que DuckDB permite realizar las operaciones directamente sobre los archivos y llevar a R solamente el resultado necesario. Ahora compararemos cuánto tarda la misma tarea con tres alternativas:
 
+:::: {.tabla-tarjeta}
+
 | Método | Procesamiento | Formato |
 |---|---|---|
 | R + CSV | R | CSV |
 | DuckDB + CSV | DuckDB | CSV |
 | DuckDB + Parquet | DuckDB | Parquet |
+
+:::: 
 
 Esto permite observar por separado dos cambios: **R frente a DuckDB utilizando los mismos archivos CSV**, y **CSV frente a Parquet utilizando DuckDB**.
 

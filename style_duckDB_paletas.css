@@ -445,12 +445,14 @@ table thead {
   margin: 1.5rem 0;
 }
 
-.comparacion-almacenamiento h3 {
+
+main.content .comparacion-almacenamiento h3 {
   color: var(--studio-ink);
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 0.8rem;
 }
+
 
 .comparacion-almacenamiento h3::after {
   display: none !important;
@@ -506,13 +508,20 @@ table thead {
   margin: 1rem 0 1.5rem;
 }
 
+
 .problema-tarjeta {
-  background: transparent;
+  background: var(--studio-surface);
+  /* Fondo blanco */
   border: 1px solid var(--studio-line);
+  /* Conserva el borde azul suave */
   border-radius: 10px;
+  /* Conserva las esquinas redondeadas */
   padding: 0.8rem 0.5rem;
+  /* Mantiene el espacio interior */
   text-align: center;
+  /* Mantiene el contenido centrado */
 }
+
 
 .problema-numero {
   font-size: 1.45rem;
@@ -643,5 +652,173 @@ table thead {
   body {
     overflow-x: clip;
     /* Impide desplazar la página completa a los lados */
+  }
+}
+
+
+/* CARACTERÍSTICAS DE DUCKDB CON ICONOS */
+
+.duckdb-caracteristicas {
+  list-style: none;
+  padding: 0 1.2rem;
+  margin: 1.5rem 0;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-line);
+  border-radius: 16px;
+  box-shadow: 0 8px 25px var(--studio-shadow);
+}
+
+.duckdb-rasgo {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--studio-soft);
+}
+
+.duckdb-rasgo:last-child {
+  border-bottom: none;
+}
+
+.duckdb-icono {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--studio-center);
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  color: var(--studio-accent);
+}
+
+.duckdb-icono svg {
+  width: 27px;
+  height: 27px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.duckdb-icono .duckdb-icono-relleno {
+  fill: #C6D9F4;
+  stroke-width: 1.2;
+}
+
+.duckdb-rasgo-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.duckdb-rasgo-texto strong {
+  display: block;
+  color: var(--studio-ink);
+  font-size: 1rem;
+  line-height: 1.4;
+  margin-bottom: 5px;
+}
+
+.duckdb-rasgo-texto p {
+  color: var(--studio-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ADAPTACIÓN PARA CELULARES CARACTERÍSTICAS DE DUCKDB CON ICONOS */
+
+@media (max-width: 700px) {
+
+  .duckdb-caracteristicas {
+    padding: 0 12px;
+  }
+
+  .duckdb-rasgo {
+    gap: 11px;
+    padding: 17px 0;
+  }
+
+  .duckdb-icono {
+    width: 39px;
+    height: 39px;
+    border-radius: 10px;
+  }
+
+  .duckdb-icono svg {
+    width: 24px;
+    height: 24px;
+  }
+
+}
+
+/* TARJETA PARA TABLAS IMPORTANTES */
+
+.tabla-tarjeta {
+  background: var(--studio-surface);
+  /* fondo blanco */
+  border: 1px solid var(--studio-line);
+  /* borde suave */
+  border-radius: 16px;
+  /* esquinas redondeadas */
+  box-shadow: 0 8px 25px var(--studio-shadow);
+  padding: 22px 24px;
+  /* arriba/abajo y lados equilibrados */
+  margin: 1.5rem 0;
+  /* separación exterior */
+}
+
+/* evita que el primer y último elemento metan espacios raros */
+.tabla-tarjeta>*:first-child {
+  margin-top: 0;
+}
+
+.tabla-tarjeta>*:last-child {
+  margin-bottom: 0;
+}
+
+/* tabla dentro de la tarjeta */
+.tabla-tarjeta table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  background: transparent;
+}
+
+/* encabezado */
+.tabla-tarjeta thead th {
+  background: #526BA5;
+  color: #FFFFFF !important;
+  /* Fuerza letras blancas sobre el encabezado azul */
+  font-weight: 700;
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--studio-line);
+  text-align: left;
+}
+
+/* celdas */
+.tabla-tarjeta tbody td {
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--studio-soft);
+}
+
+/* última fila sin borde abajo */
+.tabla-tarjeta tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* versión móvil */
+@media (max-width: 700px) {
+  .tabla-tarjeta {
+    padding: 16px 14px 18px;
+    /* también equilibrado en celular */
+    border-radius: 14px;
+  }
+
+  .tabla-tarjeta thead th,
+  .tabla-tarjeta tbody td {
+    padding: 13px 10px;
   }
 }
