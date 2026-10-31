@@ -822,8 +822,7 @@ grafico_atrasos <- ggplot2::ggplot(
   ) +
   ggplot2::labs(
     x = "Hora de ingreso",
-    y = "Envíos atrasados (%)",
-    title = "Porcentaje de atrasos según hora de ingreso"
+    y = "Envíos atrasados (%)"
   ) +
   ggplot2::theme_minimal(base_size = 12) +
   ggplot2::theme(
@@ -868,8 +867,17 @@ grafico_atrasos_interactivo <- plotly::ggplotly(
     responsive = TRUE
   )
 ```
+
+
+::: {.titulo-grafico}
+
+**Porcentaje de atrasos según hora de ingreso**
+
+:::
+
 ```{r}
 #| label: mostrar-atrasos-interactivo
+#| echo: false
 grafico_atrasos_interactivo
 ```
 
@@ -1320,8 +1328,7 @@ grafico_benchmark <- ggplot2::ggplot(
   ) +
   ggplot2::labs(
     x = NULL,
-    y = "Tiempo mediano (segundos)",
-    title = "Tiempo de ejecución según método"
+    y = "Tiempo mediano (segundos)"
   ) +
   ggplot2::theme_minimal() +
   ggplot2::theme(
@@ -1370,8 +1377,17 @@ grafico_benchmark_interactivo <- plotly::ggplotly(
   )
 ```
 
+
+::: {.titulo-grafico}
+
+**Tiempo de ejecución según método**
+
+:::
+
+
 ```{r}
 #| label: mostrar-benchmark-interactivo
+#| echo: false
 grafico_benchmark_interactivo
 ```
 

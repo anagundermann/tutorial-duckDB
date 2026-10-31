@@ -565,3 +565,32 @@ table thead {
   }
 
 }
+
+
+/* TÍTULOS EXTERNOS DE GRÁFICOS PLOTLY */
+
+.titulo-grafico {
+  text-align: center;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #30343B;
+  margin: 25px 0 12px;
+}
+
+.titulo-grafico p {
+  margin: 0;
+}
+
+/* ADAPTACIÓN PARA CELULARES */
+
+@media (max-width: 700px) {
+
+  .titulo-grafico {
+    text-align: left;
+    font-size: 17px;
+    line-height: 1.4;
+    margin: 20px 0 12px;
+  }
+
+}
