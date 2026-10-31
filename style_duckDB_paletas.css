@@ -633,3 +633,15 @@ table thead {
     font-size: 17px;
   }
 }
+
+
+/* IMPEDIR EL DESPLAZAMIENTO LATERAL DE LA PÁGINA EN CELULARES */
+
+@media (max-width: 700px) {
+
+  html,
+  body {
+    overflow-x: clip;
+    /* Impide desplazar la página completa a los lados */
+  }
+}
