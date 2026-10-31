@@ -1204,7 +1204,7 @@ Ya vimos que DuckDB permite realizar las operaciones directamente sobre los arch
 
 :::: {.tabla-tarjeta}
 
-| Método | Procesamiento | Formato |
+| Método | Software | Formato |
 |---|---|---|
 | R + CSV | R | CSV |
 | DuckDB + CSV | DuckDB | CSV |
