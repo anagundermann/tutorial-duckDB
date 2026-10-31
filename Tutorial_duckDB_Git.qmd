@@ -322,200 +322,206 @@ El siguiente código genera los 12 archivos CSV utilizados en el tutorial y los 
 set.seed(421)
 
 dir.create(
-    "datos_csv",
-    showWarnings = FALSE
+  "datos_csv",
+  showWarnings = FALSE
 )
 
 archivos_esperados <- sprintf(
-    "datos_csv/envios_2025_%02d.csv",
-    1:12
+  "datos_csv/envios_2025_%02d.csv",
+  1:12
 )
 
 if (all(file.exists(archivos_esperados))) {
+  message(
+    "Los 12 archivos CSV ya existen. Se utilizarán los archivos existentes."
+  )
+} else {
+  meses <- 1:12
+
+  factor_mensual <- c(
+    0.92,
+    0.88,
+    0.94,
+    0.97,
+    1.00,
+    1.02,
+    1.04,
+    1.01,
+    1.06,
+    1.10,
+    1.18,
+    1.32
+  )
+
+  variacion <- runif(12, 0.97, 1.03)
+
+  n_envios <- round(
+    470000 * factor_mensual * variacion
+  )
+
+  regiones <- c(
+    "Valparaiso",
+    "Metropolitana",
+    "O'Higgins",
+    "Maule",
+    "Biobio",
+    "La Araucania",
+    "Los Lagos"
+  )
+
+  prob_regiones <- c(
+    0.15,
+    0.42,
+    0.08,
+    0.07,
+    0.13,
+    0.07,
+    0.08
+  )
+
+  for (mes in meses) {
+    n <- n_envios[mes]
+
+    inicio_mes <- as.Date(
+      sprintf("2025-%02d-01", mes)
+    )
+
+    fin_mes <- lubridate::ceiling_date(
+      inicio_mes,
+      "month"
+    ) -
+      lubridate::days(1)
+
+    fecha_ingreso <- sample(
+      seq(inicio_mes, fin_mes, by = "day"),
+      n,
+      replace = TRUE
+    )
+
+    hora_decimal <- rnorm(
+      n,
+      mean = 14.2,
+      sd = 3.1
+    )
+
+    hora_decimal <- pmin(
+      pmax(hora_decimal, 7),
+      21.99
+    )
+
+    hora <- floor(hora_decimal)
+
+    minuto <- floor(
+      (hora_decimal - hora) * 60
+    )
+
+    hora_ingreso <- sprintf(
+      "%02d:%02d",
+      hora,
+      minuto
+    )
+
+    region_origen <- sample(
+      regiones,
+      n,
+      replace = TRUE,
+      prob = prob_regiones
+    )
+
+    region_destino <- sample(
+      regiones,
+      n,
+      replace = TRUE,
+      prob = prob_regiones
+    )
+
+    tipo_envio <- sample(
+      c("Estandar", "Express"),
+      n,
+      replace = TRUE,
+      prob = c(0.78, 0.22)
+    )
+
+    peso_kg <- rlnorm(
+      n,
+      meanlog = log(1.8),
+      sdlog = 0.8
+    )
+
+    peso_kg <- round(
+      pmin(pmax(peso_kg, 0.1), 30),
+      2
+    )
+
+    distancia_km <- rlnorm(
+      n,
+      meanlog = log(180),
+      sdlog = 0.75
+    )
+
+    distancia_km <- round(
+      pmin(pmax(distancia_km, 10), 1200)
+    )
+
+    prob_atraso <- 0.055 +
+      0.000035 * distancia_km +
+      ifelse(tipo_envio == "Estandar", 0.025, 0) +
+      ifelse(hora_decimal >= 17, 0.19, 0) +
+      ifelse(hora_decimal >= 19, 0.05, 0)
+
+    prob_atraso <- pmin(
+      prob_atraso,
+      0.65
+    )
+
+    atrasado <- rbinom(
+      n,
+      size = 1,
+      prob = prob_atraso
+    )
+
+    datos_mes <- tibble::tibble(
+      id_envio = sprintf(
+        "ENV2025%02d%07d",
+        mes,
+        seq_len(n)
+      ),
+      fecha_ingreso = fecha_ingreso,
+      hora_ingreso = hora_ingreso,
+      region_origen = region_origen,
+      region_destino = region_destino,
+      tipo_envio = tipo_envio,
+      peso_kg = peso_kg,
+      distancia_km = distancia_km,
+      atrasado = atrasado
+    )
+
+    archivo <- sprintf(
+      "datos_csv/envios_2025_%02d.csv",
+      mes
+    )
+
+    readr::write_csv(
+      datos_mes,
+      archivo
+    )
 
     message(
-        "Los 12 archivos CSV ya existen. Se utilizarán los archivos existentes."
-    )
-
-} else {
-
-    meses <- 1:12
-
-    factor_mensual <- c(
-      0.92, 0.88, 0.94, 0.97,
-      1.00, 1.02, 1.04, 1.01,
-      1.06, 1.10, 1.18, 1.32
-    )
-
-    variacion <- runif(12, 0.97, 1.03)
-
-    n_envios <- round(
-      470000 * factor_mensual * variacion
-    )
-
-    regiones <- c(
-      "Valparaiso",
-      "Metropolitana",
-      "O'Higgins",
-      "Maule",
-      "Biobio",
-      "La Araucania",
-      "Los Lagos"
-    )
-
-    prob_regiones <- c(
-      0.15,
-      0.42,
-      0.08,
-      0.07,
-      0.13,
-      0.07,
-      0.08
-    )
-
-    for (mes in meses) {
-
-      n <- n_envios[mes]
-
-      inicio_mes <- as.Date(
-        sprintf("2025-%02d-01", mes)
-      )
-
-      fin_mes <- lubridate::ceiling_date(
-        inicio_mes,
-        "month"
-      ) - lubridate::days(1)
-
-      fecha_ingreso <- sample(
-        seq(inicio_mes, fin_mes, by = "day"),
-        n,
-        replace = TRUE
-      )
-
-      hora_decimal <- rnorm(
-        n,
-        mean = 14.2,
-        sd = 3.1
-      )
-
-      hora_decimal <- pmin(
-        pmax(hora_decimal, 7),
-        21.99
-      )
-
-      hora <- floor(hora_decimal)
-
-      minuto <- floor(
-        (hora_decimal - hora) * 60
-      )
-
-      hora_ingreso <- sprintf(
-        "%02d:%02d",
-        hora,
-        minuto
-      )
-
-      region_origen <- sample(
-        regiones,
-        n,
-        replace = TRUE,
-        prob = prob_regiones
-      )
-
-      region_destino <- sample(
-        regiones,
-        n,
-        replace = TRUE,
-        prob = prob_regiones
-      )
-
-      tipo_envio <- sample(
-        c("Estandar", "Express"),
-        n,
-        replace = TRUE,
-        prob = c(0.78, 0.22)
-      )
-
-      peso_kg <- rlnorm(
-        n,
-        meanlog = log(1.8),
-        sdlog = 0.8
-      )
-
-      peso_kg <- round(
-        pmin(pmax(peso_kg, 0.1), 30),
-        2
-      )
-
-      distancia_km <- rlnorm(
-        n,
-        meanlog = log(180),
-        sdlog = 0.75
-      )
-
-      distancia_km <- round(
-        pmin(pmax(distancia_km, 10), 1200)
-      )
-
-      prob_atraso <- 0.055 +
-        0.000035 * distancia_km +
-        ifelse(tipo_envio == "Estandar", 0.025, 0) +
-        ifelse(hora_decimal >= 17, 0.19, 0) +
-        ifelse(hora_decimal >= 19, 0.05, 0)
-
-      prob_atraso <- pmin(
-        prob_atraso,
-        0.65
-      )
-
-      atrasado <- rbinom(
-        n,
-        size = 1,
-        prob = prob_atraso
-      )
-
-      datos_mes <- tibble::tibble(
-        id_envio = sprintf(
-          "ENV2025%02d%07d",
-          mes,
-          seq_len(n)
-        ),
-        fecha_ingreso = fecha_ingreso,
-        hora_ingreso = hora_ingreso,
-        region_origen = region_origen,
-        region_destino = region_destino,
-        tipo_envio = tipo_envio,
-        peso_kg = peso_kg,
-        distancia_km = distancia_km,
-        atrasado = atrasado
-      )
-
-      archivo <- sprintf(
-        "datos_csv/envios_2025_%02d.csv",
-        mes
-      )
-
-      readr::write_csv(
-        datos_mes,
-        archivo
-      )
-
-      message(
-        sprintf(
-          "Mes %02d: %s envios",
-          mes,
-          format(
-            n,
-            big.mark = ".",
-            decimal.mark = ",",
-            scientific = FALSE
-          )
+      sprintf(
+        "Mes %02d: %s envios",
+        mes,
+        format(
+          n,
+          big.mark = ".",
+          decimal.mark = ",",
+          scientific = FALSE
         )
       )
+    )
 
-      rm(datos_mes)
-      gc()
-    }
+    rm(datos_mes)
+    gc()
+  }
 }
 ```
 
@@ -556,6 +562,10 @@ Si no estás familiarizado con SQL, puedes desplegar la siguiente mini guía par
 
 **Instrucciones básicas de SQL**
 
+
+::: {.tabla-sql-scroll}
+
+
 | Instrucción | ¿Qué hace? | Ejemplo |
 |---|---|---|
 | `SELECT` | Indica qué columnas o resultados queremos obtener. | `SELECT hora_ingreso` |
@@ -567,6 +577,10 @@ Si no estás familiarizado con SQL, puedes desplegar la siguiente mini guía par
 | `LIMIT` | Limita el número de filas mostradas. | `LIMIT 5` |
 | `DESCRIBE` | Muestra la estructura y los tipos de las columnas. | `DESCRIBE SELECT ...` |
 
+:::
+
+::: {.tabla-sql-scroll}
+
 **Funciones que aparecen en las consultas**
 
 | Función | ¿Qué hace? | Ejemplo |
@@ -575,6 +589,8 @@ Si no estás familiarizado con SQL, puedes desplegar la siguiente mini guía par
 | `SUM()` | Suma los valores de una columna. | `SUM(atrasado)` |
 | `AVG()` | Calcula el promedio. | `AVG(atrasado)` |
 | `EXTRACT()` | Extrae una parte de una fecha u hora. | `EXTRACT(HOUR FROM hora_ingreso)` |
+
+:::
 
 :::
 
@@ -772,22 +788,25 @@ grafico_atrasos <- ggplot2::ggplot(
     y = porcentaje_atrasados,
     group = 1,
     text = paste0(
-  "Hora de ingreso: ", hora, ":00",
-  "<br>Total de envíos: ",
-  format(
-    total_envios,
-    big.mark = ".",
-    decimal.mark = ",",
-    scientific = FALSE,
-    trim = TRUE
-  ),
-  "<br>Envíos atrasados: ",
-  format(
-    round(porcentaje_atrasados, 2),
-    decimal.mark = ",",
-    nsmall = 2
-  ), "%"
-)
+      "Hora de ingreso: ",
+      hora,
+      ":00",
+      "<br>Total de envíos: ",
+      format(
+        total_envios,
+        big.mark = ".",
+        decimal.mark = ",",
+        scientific = FALSE,
+        trim = TRUE
+      ),
+      "<br>Envíos atrasados: ",
+      format(
+        round(porcentaje_atrasados, 2),
+        decimal.mark = ",",
+        nsmall = 2
+      ),
+      "%"
+    )
   )
 ) +
   ggplot2::geom_line(
@@ -812,8 +831,6 @@ grafico_atrasos <- ggplot2::ggplot(
     panel.grid.major.x = ggplot2::element_blank(),
     plot.title = ggplot2::element_text(face = "bold")
   )
-
-
 ```
 
 Una vez construido el gráfico con `ggplot2`, podemos convertirlo en una visualización interactiva mediante `plotly::ggplotly()`, sin tener que crearlo nuevamente.
@@ -840,12 +857,16 @@ grafico_atrasos_interactivo <- plotly::ggplotly(
       ),
       align = "left"
     ),
-    hovermode = "closest"
+    hovermode = "closest",
+    dragmode = FALSE,
+    xaxis = list(automargin = TRUE),
+    yaxis = list(automargin = TRUE)
   ) |>
   plotly::config(
-    displayModeBar = FALSE
+    displayModeBar = FALSE,
+    scrollZoom = FALSE,
+    responsive = TRUE
   )
-
 ```
 ```{r}
 #| label: mostrar-atrasos-interactivo
@@ -934,11 +955,11 @@ parquet_esperados <- sprintf(
 )
 
 if (all(file.exists(parquet_esperados))) {
-    message("Los 12 archivos Parquet ya existen. Se utilizarán los archivos existentes.")
+    message(
+        "Los 12 archivos Parquet ya existen. Se utilizarán los archivos existentes."
+    )
 } else {
-
     for (mes in 1:12) {
-
         archivo_csv <- sprintf(
             "datos_csv/envios_2025_%02d.csv",
             mes
@@ -978,12 +999,23 @@ Antes de repetir nuestra consulta, veamos cuánto espacio ocupan en disco los mi
 #| label: comparar_tamaño-archivos
 #| code-fold: false
 
-tamano_csv <- sum(file.info(list.files(
-            "datos_csv",pattern = "\\.csv$", full.names = TRUE))$size) / 1024^2
+tamano_csv <- sum(
+  file.info(list.files(
+    "datos_csv",
+    pattern = "\\.csv$",
+    full.names = TRUE
+  ))$size
+) /
+  1024^2
 
-tamano_parquet <- sum(file.info(list.files(
-            "datos_parquet",pattern = "\\.parquet$", full.names = TRUE))$size) / 1024^2
-
+tamano_parquet <- sum(
+  file.info(list.files(
+    "datos_parquet",
+    pattern = "\\.parquet$",
+    full.names = TRUE
+  ))$size
+) /
+  1024^2
 ```
 
 ```{r}
@@ -993,17 +1025,17 @@ tamano_parquet <- sum(file.info(list.files(
 reduccion <- 100 * (1 - tamano_parquet / tamano_csv)
 
 formato_mb <- function(x) {
-    paste0(
-        format(round(x, 1), decimal.mark = ",", nsmall = 1),
-        " MB"
-    )
+  paste0(
+    format(round(x, 1), decimal.mark = ",", nsmall = 1),
+    " MB"
+  )
 }
 
 barra_csv <- 100
 barra_parquet <- 100 * tamano_parquet / tamano_csv
 
 html_almacenamiento <- sprintf(
-    '
+  '
 <div class="comparacion-almacenamiento">
   <h3>Tamaño de almacenamiento por formato</h3>
   <p class="comparacion-subtitulo">
@@ -1031,11 +1063,11 @@ html_almacenamiento <- sprintf(
   </p>
 </div>
 ',
-    formato_mb(tamano_csv),
-    barra_csv,
-    formato_mb(tamano_parquet),
-    barra_parquet,
-    reduccion
+  formato_mb(tamano_csv),
+  barra_csv,
+  formato_mb(tamano_parquet),
+  barra_parquet,
+  reduccion
 )
 
 htmltools::HTML(html_almacenamiento)
@@ -1122,7 +1154,6 @@ tiempos_duckdb_csv <- numeric(5)
 tiempos_duckdb_parquet <- numeric(5)
 
 for (i in 1:5) {
-
     tiempos_duckdb_csv[i] <- system.time({
         DBI::dbGetQuery(con, consulta_sql_csv)
     })["elapsed"]
@@ -1138,6 +1169,7 @@ Ahora hacemos la misma tarea directamente en R. Recordemos que los 12 archivos C
 ```{r}
 #| label: benchmark-r-csv
 #| code-fold: true
+#| cache: false
 
 tiempos_r_csv <- numeric(5)
 
@@ -1148,31 +1180,42 @@ archivos_csv <- list.files(
 )
 
 for (i in 1:5) {
-
-  tiempos_r_csv[i] <- system.time({
-
-    datos_r <- lapply(
+  tiempos_r_csv[i] <- unname(system.time({
+    resumen_archivos <- lapply(
       archivos_csv,
-      readr::read_csv,
-      show_col_types = FALSE
-    ) |>
-      dplyr::bind_rows()
+      function(archivo) {
+        datos_mes <- readr::read_csv(
+          archivo,
+          col_select = c(hora_ingreso, atrasado),
+          show_col_types = FALSE
+        )
 
-    atrasos_por_hora_r <- datos_r |>
-      dplyr::mutate(
-        hora = lubridate::hour(hora_ingreso)
-      ) |>
+        datos_mes |>
+          dplyr::mutate(
+            hora = lubridate::hour(hora_ingreso)
+          ) |>
+          dplyr::group_by(hora) |>
+          dplyr::summarise(
+            total_envios = dplyr::n(),
+            envios_atrasados = sum(atrasado),
+            .groups = "drop"
+          )
+      }
+    )
+
+    atrasos_por_hora_r <- dplyr::bind_rows(
+      resumen_archivos
+    ) |>
       dplyr::group_by(hora) |>
       dplyr::summarise(
-        total_envios = dplyr::n(),
-        porcentaje_atrasados = mean(atrasado) * 100,
+        total_envios = sum(total_envios),
+        porcentaje_atrasados = 100 * sum(envios_atrasados) / sum(total_envios),
         .groups = "drop"
       ) |>
       dplyr::arrange(hora)
+  })[["elapsed"]])
 
-  })["elapsed"]
-
-  rm(datos_r)
+  rm(resumen_archivos, atrasos_por_hora_r)
   gc()
 }
 ```
@@ -1241,16 +1284,18 @@ grafico_benchmark <- ggplot2::ggplot(
     y = mediana,
     fill = metodo == metodo_rapido,
     text = paste0(
-      "<b>", metodo, "</b>",
+      "<b>",
+      metodo,
+      "</b>",
       "<br><br>Tiempo mínimo: ",
-      format(round(minimo, 2),
-             decimal.mark = ",", nsmall = 2), " s",
+      format(round(minimo, 2), decimal.mark = ",", nsmall = 2),
+      " s",
       "<br>Tiempo mediano: ",
-      format(round(mediana, 2),
-             decimal.mark = ",", nsmall = 2), " s",
+      format(round(mediana, 2), decimal.mark = ",", nsmall = 2),
+      " s",
       "<br>Tiempo máximo: ",
-      format(round(maximo, 2),
-             decimal.mark = ",", nsmall = 2), " s"
+      format(round(maximo, 2), decimal.mark = ",", nsmall = 2),
+      " s"
     )
   )
 ) +
@@ -1261,9 +1306,7 @@ grafico_benchmark <- ggplot2::ggplot(
       x = reorder(metodo, mediana),
       y = posicion_etiquetas,
       label = paste0(
-        format(round(mediana, 2),
-               decimal.mark = ",",
-               nsmall = 2),
+        format(round(mediana, 2), decimal.mark = ",", nsmall = 2),
         " s"
       )
     ),
@@ -1315,10 +1358,15 @@ grafico_benchmark_interactivo <- plotly::ggplotly(
       align = "left"
     ),
     hovermode = "closest",
-    hoverdistance = 40
+    hoverdistance = 40,
+    dragmode = FALSE,
+    xaxis = list(automargin = TRUE),
+    yaxis = list(automargin = TRUE)
   ) |>
   plotly::config(
-    displayModeBar = FALSE
+    displayModeBar = FALSE,
+    scrollZoom = FALSE,
+    responsive = TRUE
   )
 ```
 
