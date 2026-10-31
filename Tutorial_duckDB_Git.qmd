@@ -11,7 +11,6 @@ format:
     toc: true
     toc-depth: 3
     code-fold: false
-    code-summary: "Mostrar código"
     code-tools: false
     embed-resources: true
     css: style_duckDB_paletas.css
@@ -353,7 +352,7 @@ Para seguir este tutorial es suficiente con que puedas:
 
 Utilizaremos `duckdb` y `DBI` para consultar los archivos con DuckDB, `readr` y `dplyr` para comparar este flujo con el procesamiento habitual en R, y `ggplot2` para visualizar los resultados. El código que genera los datos utiliza además `lubridate`.
 
-::: {.para-ti}
+::: {.csv-estructura}
 Si alguno de estos paquetes no está instalado, puedes instalarlo una sola vez desde tu consola con:
 
 ```{r}
@@ -367,17 +366,55 @@ install.packages(c("duckdb", "DBI", "dplyr", "readr", "lubridate", "ggplot2"))
 
 A lo largo del tutorial utilizaremos la forma `paquete::funcion()` para identificar directamente de qué paquete proviene cada función.
 
-::: {.callout-warning icon="false"}
-## Antes de ejecutar
 
-La primera ejecución puede tardar algunos minutos y requiere espacio disponible en disco. Los archivos creados no necesitan conservarse: pueden eliminarse y volver a generarse ejecutando nuevamente el código.
-:::
+## Generación de los archivos CSV
 
-El siguiente código genera los 12 archivos CSV utilizados en el tutorial y los guarda en una carpeta llamada `datos_csv/`, dentro del directorio de trabajo desde el que se ejecuta el documento. Esta será la ruta que utilizaremos más adelante para consultarlos con DuckDB. Como el código solo prepara los datos, **no necesitas comprender cada una de sus instrucciones para continuar**.
+El siguiente código prepara los **12 archivos CSV** que utilizaremos en el tutorial, uno por cada mes de 2025. Los guarda dentro de una carpeta llamada `datos_csv/`, en el directorio de trabajo del documento.
+
+Cada archivo sigue el mismo esquema de nombre: `envios_2025_MM.csv`, donde `MM` corresponde al número del mes, desde `01` hasta `12`.
+
+Si los 12 archivos ya existen, el código los reutiliza. Como esta etapa solamente prepara los datos, **no necesitas comprender cada una de sus instrucciones para continuar**.
+
+A continuación veremos cómo quedan organizados.
+
+
+```{=html}
+<div class="csv-estructura">
+  <div class="csv-estructura-titulo">
+    Estructura de archivos generados
+  </div>
+
+  <pre class="csv-estructura-arbol">📁 datos_csv/
+   ├── envios_2025_01.csv
+   ├── envios_2025_02.csv
+   ├── envios_2025_03.csv
+   ├── ...
+   └── envios_2025_12.csv</pre>
+
+  <p class="csv-estructura-nota">
+    12 archivos CSV · Uno por cada mes de 2025
+  </p>
+</div>
+```
+
+Observa que los nombres mantienen una misma estructura: solamente cambia el número del mes. Más adelante aprovecharemos esa característica para consultar los 12 archivos con una sola instrucción de DuckDB.
+
+
+
+::: {.csv-estructura}
+
+**Ahora, genera los archivos**
+
+Para continuar con el tutorial, despliega el siguiente código R, cópialo completo y ejecútalo desde el directorio de trabajo del documento.
+
+El código creará la carpeta `datos_csv/` y los 12 archivos mensuales que acabamos de mostrar.
+
+**Importante:** La primera ejecución puede tardar algunos minutos y requiere espacio disponible en disco. Si los 12 archivos ya existen, el código los reutilizará.
 
 ```{r}
 #| label: generar-datos
 #| code-fold: true
+#| code-summary: "Abrir y copiar el código R para generar los 12 archivos CSV"
 
 set.seed(421)
 
@@ -585,7 +622,9 @@ if (all(file.exists(archivos_esperados))) {
 }
 ```
 
-Una vez generados los archivos, podemos comenzar a consultarlos directamente con DuckDB.
+Una vez ejecutado el código, comprueba que la carpeta `datos_csv/` contenga los 12 archivos mensuales. Con los datos preparados, ya podemos comenzar a consultarlos con DuckDB.
+
+:::
 
 ::: {.inicio-parte}
 **PARTE 1** · Consultar y analizar con DuckDB
@@ -604,13 +643,25 @@ con <- DBI::dbConnect(duckdb::duckdb())
 
 ## Los 12 archivos como una sola fuente de datos
 
-DuckDB puede consultar varios archivos que comparten la misma estructura utilizando un patrón en la ruta. En este caso:
+
+Como vimos en la estructura de archivos generados, dentro de `datos_csv/` tenemos 12 archivos mensuales. Todos comparten el nombre `envios_2025_`, seguido del número del mes.
+
+DuckDB permite aprovechar esa organización para consultar **todos los archivos como una sola fuente de datos**, sin tener que escribir sus nombres individualmente.
+
+Para ello utilizamos el siguiente patrón:
 
 `datos_csv/envios_2025_*.csv`
 
-El símbolo `*` permite incluir los 12 archivos mensuales en una misma consulta.
+**¿Qué significa cada parte?**
 
-La función `read_csv_auto()` permite que DuckDB lea los archivos CSV e infiera automáticamente la estructura de sus columnas.
+- `datos_csv/` indica la carpeta que contiene los archivos.
+- `envios_2025_` es la parte fija del nombre.
+- `*` es un comodín que representa los caracteres que cambian. En nuestro caso, coincide con los meses `01`, `02`, ..., `12`.
+- `.csv` indica la extensión de los archivos.
+
+Así, DuckDB puede encontrar los 12 archivos y utilizarlos dentro de una misma consulta SQL.
+
+La función `read_csv_auto()` permite leer esos archivos e inferir automáticamente la estructura de sus columnas.
 
 Como las consultas a DuckDB se escriben en SQL, conviene conocer algunas de sus instrucciones básicas.
 Si no estás familiarizado con SQL, puedes desplegar la siguiente mini guía para consultar sus instrucciones básicas antes de continuar.
@@ -692,6 +743,7 @@ Para obtener el mismo resultado siguiendo un flujo habitual en R, podemos leer l
 #| label: contar-envios-r
 #| code-fold: true
 #| eval: false
+#| code-summary: "Mostrar código para contar los envíos con R"
 
 # Este bloque no se ejecuta al renderizar porque
 # crea un objeto de gran tamaño en la memoria de R.
@@ -723,7 +775,7 @@ Así podrás **darte una idea de cuánto tienes que esperar para que R cargue lo
 
 El procedimiento con `readr` y `dplyr` obtiene el mismo conteo, pero antes tiene que crear `datos` en la memoria de R. Con DuckDB, en cambio, R solo recibió el resultado de la consulta.
 
-::: {.para-ti}
+::: {.csv-estructura}
 **La idea importante**
 
 La diferencia no está en el conteo obtenido, sino en **qué datos llegan a R antes de obtenerlo**.
@@ -838,6 +890,7 @@ Ahora veamos ese resultado en un gráfico:
 ```{r}
 #| label: grafico-atrasos-hora
 #| code-fold: true
+#| code-summary: "Mostrar código para graficar los atrasos por hora"
 #| fig-width: 9
 #| fig-height: 4.5
 
@@ -899,6 +952,7 @@ Al pasar el cursor sobre la línea, podremos consultar la hora de ingreso, el to
 ```{r}
 #| label: plotly-atrasos-hora
 #| code-fold: true
+#| code-summary: "Mostrar código para visualizar los atrasos por hora con Plotly"
 #| fig-width: 9
 #| fig-height: 4.5
 grafico_atrasos_interactivo <- plotly::ggplotly(
@@ -950,7 +1004,7 @@ Hasta las 16:00, la proporción de atrasos se mantiene cercana al 8 %. A partir 
 
 Por lo tanto, en estos datos existe una **asociación entre la hora de ingreso y la proporción de atrasos**. Esta comparación es descriptiva: no permite concluir que la hora de ingreso sea, por sí sola, la causa del atraso.
 
-::: {.para-ti}
+::: {.csv-estructura}
 **¿Qué conseguimos?**
 
 DuckDB realizó la **agrupación y los cálculos por hora** y devolvió en R un resumen de solo **15 filas** que llamamos `atrasos_por_hora`. A partir de ese objeto pudimos continuar trabajando directamente en R y construir el gráfico.
@@ -1014,6 +1068,7 @@ Cuando ejecutes el siguiente código, se generarán **12 archivos Parquet** dent
 ```{r}
 #| label: convertir-parquet
 #| code-fold: true
+#| code-summary: "Mostrar código para convertir los archivos CSV a Parquet"
 
 dir.create(
     "datos_parquet",
@@ -1244,6 +1299,7 @@ Ahora hacemos la misma tarea directamente en R. Recordemos que los 12 archivos C
 ```{r}
 #| label: benchmark-r-csv
 #| code-fold: true
+#| code-summary: "Mostrar código para medir el tiempo de procesamiento de CSV con R"
 #| cache: false
 
 tiempos_r_csv <- numeric(5)
@@ -1321,6 +1377,7 @@ Como los tiempos pueden variar entre ejecuciones, utilizaremos la **mediana de l
 ```{r}
 #| label: resumen-benchmark
 #| code-fold: true
+#| code-summary: "Mostrar código para resumir los resultados del benchmark"
 
 resumen_benchmark <- resultados_benchmark |>
   dplyr::group_by(metodo) |>
@@ -1341,6 +1398,7 @@ Para visualizar la diferencia entre los tres métodos, representemos sus tiempos
 ```{r}
 #| label: grafico-benchmark
 #| code-fold: true
+#| code-summary: "Mostrar código para graficar los resultados del benchmark"
 #| fig-width: 9
 #| fig-height: 5.5
 
@@ -1413,6 +1471,7 @@ Al pasar el cursor sobre cada barra, podremos consultar el tiempo mediano de eje
 ```{r}
 #| label: plotly-benchmark
 #| code-fold: true
+#| code-summary: "Mostrar código para visualizar los resultados del benchmark con Plotly"
 #| fig-width: 9
 #| fig-height: 5.5
 
@@ -1489,7 +1548,7 @@ DBI::dbIsValid(con)
 
 El resultado `FALSE` confirma que la conexión ya no está activa.
 
-::: {.callout-tip collapse="true" icon="false"}
+::: {.callout-tip .resumen-propio collapse="true" icon="false"}
 # Resumen: usar DuckDB con tus propios datos
 
 Este es el flujo básico que puedes reutilizar cuando quieras trabajar con tus propios archivos.
@@ -1690,4 +1749,14 @@ En esos casos existen otras herramientas, como Spark o bases de datos en la nube
 
 </footer>
 
+```
+
+```{=html}
+<script>
+  // Intentar evitar "Tocar para buscar" en celulares,
+  // conservando la selección de texto.
+  if (window.matchMedia("(max-width: 700px)").matches) {
+    document.body.setAttribute("tabindex", "-1");
+  }
+</script>
 ```

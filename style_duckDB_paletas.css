@@ -822,3 +822,128 @@ main.content .comparacion-almacenamiento h3 {
     padding: 13px 10px;
   }
 }
+
+
+/* DIAGRAMA DE LA CARPETA DE ARCHIVOS CSV */
+
+.csv-estructura {
+  background: var(--studio-surface);
+  /* Fondo blanco */
+  border: 1px solid var(--studio-line);
+  /* Borde azul suave */
+  border-radius: 16px;
+  /* Esquinas redondeadas */
+  padding: 22px 24px;
+  /* Espacio interior */
+  margin: 24px 0;
+  /* Separación respecto a los párrafos */
+  box-shadow: 0 8px 25px var(--studio-shadow);
+}
+
+.csv-estructura-titulo {
+  color: var(--studio-ink);
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 14px;
+}
+
+.csv-estructura-arbol {
+  background: var(--studio-page);
+  color: var(--studio-ink);
+  border: 1px solid var(--studio-soft);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 0;
+  font-family: Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.8;
+  white-space: pre;
+  /* Conserva la forma del árbol */
+  overflow-x: auto;
+  /* Permite desplazamiento si no cabe */
+}
+
+.csv-estructura-nota {
+  color: var(--studio-muted);
+  font-size: 0.85rem;
+  margin: 14px 0 0;
+}
+
+/* ADAPTACIÓN PARA CELULARES */
+
+@media (max-width: 700px) {
+
+  .csv-estructura {
+    padding: 16px 12px;
+    /* Reduce los espacios laterales */
+  }
+
+  .csv-estructura-arbol {
+    padding: 12px 8px;
+    font-size: 0.75rem;
+    /* Reduce ligeramente las letras */
+  }
+
+}
+
+
+/* DESPLEGABLES COMPLEMENTARIOS:
+   Mini guía SQL y resumen para usar datos propios */
+
+/* Apariencia general de las dos tarjetas */
+.callout.callout-tip.mini-sql,
+.callout.callout-tip.resumen-propio {
+  background: #FFFFFF !important;
+  border: 1px solid #9CDCCD !important;
+  border-left: 4px solid #18BC9C !important;
+  transition: box-shadow 0.2s ease;
+}
+
+/* Encabezado visible cuando están cerradas */
+.callout.callout-tip.mini-sql .callout-header,
+.callout.callout-tip.resumen-propio .callout-header {
+  background: #E7F7F2 !important;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* Color al pasar el mouse */
+.callout.callout-tip.mini-sql .callout-header:hover,
+.callout.callout-tip.resumen-propio .callout-header:hover {
+  background: #D1F0E6 !important;
+}
+
+/* Títulos */
+.callout.callout-tip.mini-sql .callout-title-container,
+.callout.callout-tip.resumen-propio .callout-title-container {
+  color: #176D5B !important;
+  font-weight: 700;
+}
+
+/* Flecha que indica que se pueden abrir */
+.callout.callout-tip.mini-sql .callout-toggle,
+.callout.callout-tip.resumen-propio .callout-toggle {
+  color: #18BC9C !important;
+}
+
+/* Interior blanco al desplegar el contenido */
+.callout.callout-tip.mini-sql .callout-body-container,
+.callout.callout-tip.resumen-propio .callout-body-container {
+  background: #FFFFFF !important;
+}
+
+
+/* ENCABEZADOS DE LAS TABLAS DE LA MINI GUÍA SQL */
+
+.mini-sql table thead th {
+  background-color: #E7F7F2 !important;
+  /* Verde muy suave */
+}
+
+/* Fondo de Instrucción | ¿Qué hace? | Ejemplo */
+/* También se aplica a Función | ¿Qué hace? | Ejemplo */
+
+.mini-sql table thead th {
+  background-color: #F7FCFA !important;
+  /* Verde casi blanco */
+}
